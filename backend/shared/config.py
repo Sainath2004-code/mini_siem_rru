@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     CLICKHOUSE_USER: str = Field(default="default")
     CLICKHOUSE_PASSWORD: str = Field(default="")
     CLICKHOUSE_DB: str = Field(default="sentinelx")
+    
+    # AI
+    OPENAI_API_KEY: str = Field(default="")
+    OPENAI_MODEL: str = Field(default="gpt-4o")
 
     class Config:
         env_file = ".env"

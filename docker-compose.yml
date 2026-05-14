@@ -158,6 +158,22 @@ services:
     environment:
       - SERVICE_NAME=parser-service
 
+  enrichment-service:
+    <<: *backend-base
+    build:
+      context: ./backend
+      dockerfile: services/enrichment-service/Dockerfile
+    environment:
+      - SERVICE_NAME=enrichment-service
+
+  storage-service:
+    <<: *backend-base
+    build:
+      context: ./backend
+      dockerfile: services/storage-service/Dockerfile
+    environment:
+      - SERVICE_NAME=storage-service
+
   detection-service:
     <<: *backend-base
     # No container_name — allows replicas to scale
