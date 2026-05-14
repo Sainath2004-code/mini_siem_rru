@@ -5,14 +5,18 @@ from datetime import datetime
 from backend.shared.kafka.consumer import AsyncKafkaConsumer
 from backend.shared.kafka.producer import kafka_producer
 from backend.shared.config import settings
-from backend.shared.parsers.registry import parser_registry
 from backend.shared.parsers.json_parser import JsonParser
+from backend.shared.parsers.syslog_parser import SyslogParser
+from backend.shared.parsers.winevent_parser import WindowsEventParser
+from backend.shared.parsers.registry import parser_registry
 from backend.shared.models.events import SentinelXEvent
 
 logger = structlog.get_logger()
 
 # Register default parsers
 parser_registry.register(JsonParser())
+parser_registry.register(SyslogParser())
+parser_registry.register(WindowsEventParser())
 
 async def insert_to_clickhouse_batch(events: list):
     """

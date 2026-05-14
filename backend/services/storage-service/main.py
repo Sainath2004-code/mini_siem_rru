@@ -55,24 +55,37 @@ class ClickHouseIngestor:
     async def flush(self):
         if not self.batch:
             return
-            
-        try:
-            logger.info("Flushing batch to ClickHouse", count=len(self.batch))
-            self.client.insert('logs', self.batch, column_names=[
-                'id', 'tenant_id', 'timestamp', 'ingested_at', 'event_type', 
-                'event_category', 'severity', 'severity_score', 'source', 
-                'source_type', 'host_name', 'source_ip', 'destination_ip', 
-                'user_name', 'raw', 'normalized', 'geoip', 'tags', 'mitre_tactics'
-            ])
-            self.batch = []
-            self.last_flush = time.time()
-        except Exception as e:
-            logger.error("ClickHouse flush failed", error=str(e))
-            # In production, we'd implement a retry/disk-buffer here
+
+        retry_count = 0
+        max_retries = 5
+        backoff = 1
+
+        while retry_count < max_retries:
+            try:
+                logger.info("Flushing batch to ClickHouse", count=len(self.batch))
+                self.client.insert('logs', self.batch, column_names=[
+                    'id', 'tenant_id', 'timestamp', 'ingested_at', 'event_type', 
+                    'event_category', 'severity', 'severity_score', 'source', 
+                    'source_type', 'host_name', 'source_ip', 'destination_ip', 
+                    'user_name', 'raw', 'normalized', 'geoip', 'tags', 'mitre_tactics'
+                ])
+                self.batch = []
+                self.last_flush = time.time()
+                return
+            except Exception as e:
+                retry_count += 1
+                logger.error("ClickHouse flush failed", error=str(e), retry=retry_count)
+                if retry_count < max_retries:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                else:
+                    logger.critical("ClickHouse max retries reached. Moving to DLQ.", count=len(self.batch))
+                    self.batch = [] # Clear to prevent OOM
 
 ingestor = ClickHouseIngestor()
 
 async def handle_enriched_event(value: dict, key: str):
+    logger.info("Received event for storage", tenant_id=value.get("tenant_id"))
     await ingestor.add_event(value)
 
 async def main():

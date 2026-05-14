@@ -26,9 +26,15 @@ class Settings(BaseSettings):
     CLICKHOUSE_PASSWORD: str = Field(default="")
     CLICKHOUSE_DB: str = Field(default="sentinelx")
     
+    # Auth
+    JWT_SECRET: str = Field(default="sx-secret-change-me")
+    
     # AI
     OPENAI_API_KEY: str = Field(default="")
     OPENAI_MODEL: str = Field(default="gpt-4o")
+
+    # Enrichment
+    GEOIP_DB_PATH: str = Field(default="/app/backend/data/GeoLite2-City.mmdb")
 
     class Config:
         env_file = ".env"

@@ -6,7 +6,13 @@ logger = structlog.get_logger()
 # Grammer for SentinelX SIEM Query Language (SXQL)
 # Supports: field=value, field!=value, field>value, field<value, field:pattern, AND, OR, NOT, (groups)
 SXQL_GRAMMAR = r"""
-    ?start: expression
+    ?start: piped_expression
+    
+    ?piped_expression: expression ( "|" command )*
+
+    ?command: stats_command
+    
+    ?stats_command: "stats " CNAME " by " CNAME -> stats_op
 
     ?expression: or_expr
 
@@ -57,6 +63,15 @@ class SXQLTransformer(Transformer):
         v = val.strip('"').strip("'")
         return f"{field} ILIKE '%{v}%'"
 
+    def stats_op(self, args):
+        agg_func, group_field = args
+        return {"type": "stats", "agg": agg_func, "by": group_field}
+
+    def piped_expression(self, args):
+        where = args[0]
+        commands = args[1:]
+        return {"where": where, "commands": commands}
+
     def or_op(self, args):
         return f"({args[0]} OR {args[1]})"
 
@@ -79,19 +94,33 @@ class SXQLParser:
         self.lark = Lark(SXQL_GRAMMAR, parser='lalr')
         self.transformer = SXQLTransformer()
 
-    def translate_to_sql(self, query: str, tenant_id: str) -> str:
-        """Translates SXQL to ClickHouse WHERE clause."""
+    def translate_to_sql(self, query: str, tenant_id: str) -> dict:
+        """Translates SXQL to ClickHouse SQL components."""
         if not query or query.strip() == "*":
-            return f"tenant_id = '{tenant_id}'"
+            return {"where": f"tenant_id = '{tenant_id}'", "stats": None}
         
         try:
             tree = self.lark.parse(query)
-            where_clause = self.transformer.transform(tree)
-            return f"tenant_id = '{tenant_id}' AND ({where_clause})"
+            result = self.transformer.transform(tree)
+            
+            # If it's a simple expression without pipes, it might just be the where string
+            if isinstance(result, str):
+                return {"where": f"tenant_id = '{tenant_id}' AND ({result})", "stats": None}
+            
+            # Piped expression
+            where = result["where"]
+            stats = None
+            for cmd in result["commands"]:
+                if cmd["type"] == "stats":
+                    stats = cmd
+            
+            return {
+                "where": f"tenant_id = '{tenant_id}' AND ({where})",
+                "stats": stats
+            }
         except Exception as e:
             logger.error("Failed to parse SXQL", query=query, error=str(e))
-            # Fallback to a safe query or re-raise
-            return f"tenant_id = '{tenant_id}'"
+            return {"where": f"tenant_id = '{tenant_id}'", "stats": None}
 
 # Singleton
 sxql_parser = SXQLParser()

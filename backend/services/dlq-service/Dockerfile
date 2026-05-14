@@ -2,7 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential librdkafka-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -10,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . ./backend/
-ENV PYTHONPATH=/app
+COPY . .
 
-CMD ["uvicorn", "backend.services.api-gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uvicorn", "services.dlq-service.main:app", "--host", "0.0.0.0", "--port", "8011", "--workers", "1"]

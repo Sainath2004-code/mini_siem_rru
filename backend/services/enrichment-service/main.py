@@ -9,18 +9,56 @@ from backend.shared.cache.redis_client import redis_client
 
 logger = structlog.get_logger()
 
+import geoip2.database
+from ipaddress import ip_address
+
+# Initialize MaxMind reader (Path would be configured in settings)
+# In production, this file is updated weekly via a cron job
+GEOIP_READER = None
+try:
+    GEOIP_READER = geoip2.database.Reader(settings.GEOIP_DB_PATH)
+except Exception as e:
+    logger.error("Failed to load GeoIP database", error=str(e))
+
 async def enrich_geoip(event: dict) -> dict:
-    """Enriches event with GeoIP data (Mock for now, would use MaxMind)."""
-    if event.get("source_ip"):
-        # Mock GeoIP lookup
-        event["geoip"] = {
-            "country": "United States",
-            "city": "San Francisco",
-            "lat": 37.7749,
-            "lon": -122.4194,
-            "asn": 15169,
-            "isp": "Google LLC"
+    """Enriches event with real GeoIP data using MaxMind and Redis cache."""
+    ip = event.get("source_ip")
+    if not ip or not GEOIP_READER:
+        return event
+
+    try:
+        # 1. Skip private IPs
+        addr = ip_address(ip)
+        if addr.is_private:
+            event["geoip"] = {"city": "internal", "country": "internal", "isp": "internal"}
+            return event
+
+        # 2. Check Redis Cache
+        cache_key = f"geoip:cache:{ip}"
+        cached = await redis_client.get(cache_key)
+        if cached:
+            event["geoip"] = json.loads(cached)
+            return event
+
+        # 3. Real Lookup
+        response = GEOIP_READER.city(ip)
+        geo_data = {
+            "country": response.country.name,
+            "country_code": response.country.iso_code,
+            "city": response.city.name,
+            "lat": response.location.latitude,
+            "lon": response.location.longitude,
+            "asn": None, # Requires GeoLite2-ASN db
+            "isp": None
         }
+        
+        # 4. Cache for 24h
+        await redis_client.setex(cache_key, 86400, json.dumps(geo_data))
+        event["geoip"] = geo_data
+        
+    except Exception as e:
+        logger.debug("GeoIP lookup failed", ip=ip, error=str(e))
+    
     return event
 
 async def check_threat_intel(event: dict) -> dict:

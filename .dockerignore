@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/venv
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.git
+**/.env
+**/.env.template
+**/*.mmdb
+**/*.log
+docker-compose.yml
+README.md
+docs/
+database/
+scripts/
+tests/

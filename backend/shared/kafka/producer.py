@@ -1,3 +1,4 @@
+import threading
 import json
 import asyncio
 from confluent_kafka import Producer, KafkaException
@@ -20,7 +21,20 @@ class AsyncKafkaProducer:
             'acks': 'all'
         }
         self.producer = Producer(conf)
-        self._loop = asyncio.get_event_loop()
+        self.running = True
+        self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._poll_thread.start()
+    
+    def _poll_loop(self):
+        while self.running:
+            self.producer.poll(0.1)
+    
+    @property
+    def loop(self):
+        try:
+            return asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.get_event_loop()
     
     def _delivery_report(self, err, msg):
         if err is not None:
@@ -40,7 +54,7 @@ class AsyncKafkaProducer:
                 kafka_headers = [(k, v.encode('utf-8') if isinstance(v, str) else v) for k, v in headers.items()]
 
             # Run in executor to not block event loop
-            await self._loop.run_in_executor(
+            await self.loop.run_in_executor(
                 None,
                 self._produce_sync,
                 topic,
@@ -53,6 +67,7 @@ class AsyncKafkaProducer:
             raise
             
     def _produce_sync(self, topic: str, value: bytes, key: bytes, headers: list):
+        logger.info("Actually producing to Kafka", topic=topic)
         self.producer.produce(
             topic=topic,
             value=value,

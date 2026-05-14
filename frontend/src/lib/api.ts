@@ -72,6 +72,23 @@ export const aiApi = {
     apiRequest<{ status: string; result?: string }>(`/ai/result/${requestId}`),
 }
 
+// ---- Incidents ----
+export const incidentsApi = {
+  list: () => apiRequest<any[]>("/incidents"),
+  get: (id: string) => apiRequest<any>(`/incidents/${id}`),
+  create: (data: object) =>
+    apiRequest<any>("/incidents", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: object) =>
+    apiRequest<any>(`/incidents/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+}
+
+// ---- Threat Intel ----
+export const threatIntelApi = {
+  checkIp: (ip: string) => apiRequest<any>(`/threat-intel/lookup/ip/${ip}`),
+  syncFeed: (feedUrl: string) =>
+    apiRequest<any>("/threat-intel/sync", { method: "POST", body: JSON.stringify({ url: feedUrl }) }),
+}
+
 // ---- WebSocket ----
 export function createSentinelXWebSocket(onMessage: (data: any) => void): WebSocket {
   const token = typeof window !== "undefined" ? localStorage.getItem("sx_token") : ""

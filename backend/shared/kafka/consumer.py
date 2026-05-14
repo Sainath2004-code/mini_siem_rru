@@ -18,19 +18,20 @@ class AsyncKafkaConsumer:
             'session.timeout.ms': 45000,
             'max.poll.interval.ms': 300000,
         }
+        self.group_id = group_id
         self.consumer = Consumer(conf)
         self.consumer.subscribe(topics)
         self.topics = topics
-        self._loop = asyncio.get_event_loop()
         self.running = False
 
     async def start(self, handler: Callable[[dict, str], Coroutine[Any, Any, None]]):
         """Starts the consumption loop. Handler should be an async function."""
+        self._loop = asyncio.get_running_loop()
         self.running = True
-        logger.info("Starting consumer", topics=self.topics, group_id=self.consumer.member_id())
+        logger.info("Starting consumer", topics=self.topics, group_id=self.group_id)
         
         # Run in executor to not block event loop
-        await self._loop.run_in_executor(None, self._consume_loop, handler)
+        self._future = self._loop.run_in_executor(None, self._consume_loop, handler)
 
     def _consume_loop(self, handler: Callable[[dict, str], Coroutine[Any, Any, None]]):
         while self.running:
@@ -48,6 +49,8 @@ class AsyncKafkaConsumer:
                 topic = msg.topic()
                 value = json.loads(msg.value().decode('utf-8'))
                 key = msg.key().decode('utf-8') if msg.key() else None
+                
+                logger.debug("Received message for processing", topic=topic, key=key)
                 
                 # Execute async handler
                 future = asyncio.run_coroutine_threadsafe(handler(value, key), self._loop)

@@ -28,5 +28,5 @@ CREATE TABLE IF NOT EXISTS sentinelx.logs (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (tenant_id, timestamp, severity, event_type)
-TTL timestamp + INTERVAL 90 DAY
+TTL toDateTime(timestamp) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;

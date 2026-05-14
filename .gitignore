@@ -58,3 +58,12 @@ Thumbs.db
 *.key
 *.crt
 *.pfx
+
+# Large Data
+backend/data/
+
+# Temporary Deployment Scripts
+backend/apply_supabase_schema.py
+backend/check_supabase.py
+backend/find_supabase_region.py
+backend/fix_api_key_hash.py

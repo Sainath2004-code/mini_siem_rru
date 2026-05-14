@@ -28,13 +28,18 @@ class SearchQuery(BaseModel):
     limit: int = 100
     offset: int = 0
 
+from backend.shared.auth.middleware import tenant_guard
+from fastapi import Request
+
 @app.post("/search/logs")
-async def search_logs(query_payload: SearchQuery, x_tenant_id: str = Header(...)):
-    """Executes a SIEM search query against ClickHouse."""
+async def search_logs(request: Request, query_payload: SearchQuery, _ = Depends(tenant_guard)):
+    """Executes a SIEM search query against ClickHouse with enforced tenant isolation."""
     start_time = time.time()
+    tenant_id = request.state.tenant_id
     
     # 1. Translate Query
-    where_clause = sxql_parser.translate_to_sql(query_payload.query, x_tenant_id)
+    plan = sxql_parser.translate_to_sql(query_payload.query, tenant_id)
+    where_clause = plan["where"]
     
     # 2. Add time constraints
     if query_payload.time_range_start:
@@ -42,14 +47,28 @@ async def search_logs(query_payload: SearchQuery, x_tenant_id: str = Header(...)
     if query_payload.time_range_end:
         where_clause += f" AND timestamp <= '{query_payload.time_range_end}'"
 
-    # 3. Execute in ClickHouse
-    sql = f"""
-        SELECT * FROM logs 
-        WHERE {where_clause} 
-        ORDER BY timestamp DESC 
-        LIMIT {query_payload.limit} 
-        OFFSET {query_payload.offset}
-    """
+    # 3. Handle Aggregates (stats command)
+    if plan["stats"]:
+        group_by = plan["stats"]["by"]
+        agg = plan["stats"]["agg"]
+        # Example: | stats count by source_ip -> SELECT source_ip, count(*) as value ... GROUP BY source_ip
+        sql = f"""
+            SELECT {group_by}, {agg}(*) as value 
+            FROM logs 
+            WHERE {where_clause} 
+            GROUP BY {group_by} 
+            ORDER BY value DESC 
+            LIMIT {query_payload.limit}
+        """
+    else:
+        # Standard search
+        sql = f"""
+            SELECT * FROM logs 
+            WHERE {where_clause} 
+            ORDER BY timestamp DESC 
+            LIMIT {query_payload.limit} 
+            OFFSET {query_payload.offset}
+        """
     
     try:
         res = ch_client.query(sql)
@@ -57,7 +76,8 @@ async def search_logs(query_payload: SearchQuery, x_tenant_id: str = Header(...)
         
         return {
             "results": results,
-            "total": len(results), # In production, we'd do a separate COUNT(*) or estimate
+            "total": len(results),
+            "is_aggregate": plan["stats"] is not None,
             "query_sql": sql,
             "latency_ms": int((time.time() - start_time) * 1000)
         }
