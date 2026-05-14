@@ -5,7 +5,7 @@ global_config:
 scrape_configs:
   - job_name: "sentinelx-api-gateway"
     static_configs:
-      - targets: ["api-gateway:8000"]
+      - targets: ["api-gateway:8000"]   # internal container port
     metrics_path: /metrics
 
   - job_name: "sentinelx-ingestion"

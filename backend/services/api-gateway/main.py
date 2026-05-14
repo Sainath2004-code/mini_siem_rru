@@ -21,9 +21,9 @@ app.add_middleware(
 # Since this is a gateway, we proxy requests to internal services.
 # Note: In a real monorepo docker setup, hostnames would be the service names (e.g. http://ingestion-service:8001)
 ROUTES = {
-    "/ingest": "http://localhost:8001",
-    "/search": "http://localhost:8005",
-    "/alerts": "http://localhost:8004",
+    "/ingest": "http://localhost:9101",
+    "/search": "http://localhost:9105",
+    "/alerts": "http://localhost:9104",
 }
 
 client = httpx.AsyncClient()
@@ -37,7 +37,7 @@ async def proxy(request: Request, path: str):
             break
             
     if not target_url:
-        target_url = f"http://localhost:8001{request.url.path}" # Default fallback for now
+        target_url = f"http://localhost:9101{request.url.path}" # Default fallback
         
     logger.info(f"Proxying request to {target_url}")
     

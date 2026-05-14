@@ -12,16 +12,16 @@ class Settings(BaseSettings):
     SUPABASE_JWT_SECRET: str = Field(default="")
     
     # Redis
-    REDIS_URL: str = Field(default="redis://localhost:6379/0")
+    REDIS_URL: str = Field(default="redis://localhost:6479/0")
     
     # Kafka
-    KAFKA_BROKERS: str = Field(default="localhost:29092")
+    KAFKA_BROKERS: str = Field(default="localhost:29192")
     KAFKA_CONSUMER_GROUP_PARSER: str = Field(default="parser-group")
     KAFKA_CONSUMER_GROUP_DETECTION: str = Field(default="detection-group")
     
     # ClickHouse
     CLICKHOUSE_HOST: str = Field(default="localhost")
-    CLICKHOUSE_PORT: int = Field(default=8123)
+    CLICKHOUSE_PORT: int = Field(default=9123)
     CLICKHOUSE_USER: str = Field(default="default")
     CLICKHOUSE_PASSWORD: str = Field(default="")
     CLICKHOUSE_DB: str = Field(default="sentinelx")

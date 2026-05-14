@@ -1,7 +1,7 @@
 import { BaseLogEvent } from "./types"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8006"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9100"
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:9106"
 
 function getAuthHeaders(): HeadersInit {
   const token = typeof window !== "undefined" ? localStorage.getItem("sx_token") : ""
